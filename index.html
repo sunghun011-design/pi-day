@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MathCanvas AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@400;700&family=Noto+Sans+KR:wght@400;700&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #1A1A2E;
+            --highlight-color: #FF8C42;
+            --coral-color: #F76C6C;
+            --text-color: #E0E0E0;
+            --card-bg: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 2rem;
+            background-image: radial-gradient(circle at center, rgba(63, 81, 181, 0.2), rgba(26, 26, 46, 0.8));
+        }
+
+        .container {
+            max-width: 90rem;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+
+        h1, h2 {
+            font-family: 'Exo 2', sans-serif;
+            font-weight: 700;
+        }
+
+        h1 {
+            color: var(--highlight-color);
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 150px;
+            height: 40px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #333;
+            transition: .4s;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 5px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 34px;
+            width: 70px;
+            left: 3px;
+            bottom: 3px;
+            background-color: var(--coral-color);
+            transition: .4s;
+            border-radius: 17px;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(70px);
+        }
+
+        .slider-text {
+            color: #fff;
+            font-weight: bold;
+            font-size: 14px;
+            z-index: 1;
+        }
+
+        .btn-primary {
+            background-color: var(--highlight-color);
+            color: #1A1A2E;
+            font-weight: bold;
+            transition: transform 0.2s, box-shadow 0.2s;
+            border: none;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(255, 140, 66, 0.4);
+        }
+
+        .btn-secondary {
+            background-color: transparent;
+            border: 2px solid var(--highlight-color);
+            color: var(--highlight-color);
+            transition: background-color 0.2s, color 0.2s;
+        }
+
+        .btn-secondary:hover {
+            background-color: var(--highlight-color);
+            color: var(--bg-color);
+        }
+
+        .modal {
+            background-color: rgba(26, 26, 46, 0.8);
+            backdrop-filter: blur(5px);
+            display: none;
+        }
+
+        .inspiration-result-container {
+            border: 2px dashed rgba(255, 255, 255, 0.3);
+        }
+
+        .input-card {
+            background-color: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .loading-spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: var(--highlight-color);
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @media (min-width: 1024px) {
+            .lab-mode-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center p-8 lg:p-12">
+    <!-- Main Container -->
+    <div class="container rounded-2xl p-6 lg:p-10 shadow-2xl transition-all duration-500 card">
+        <!-- Header -->
+        <header class="flex flex-col sm:flex-row justify-between items-center gap-4">
+            <h1 class="text-4xl lg:text-5xl">MathCanvas AI</h1>
+            <button id="mixerButton" class="btn-primary rounded-full px-6 py-2 text-base flex items-center gap-2 transition-all">
+                <span class="text-xl">✨</span> 영감 믹서
+            </button>
+            <label class="toggle-switch mt-4 sm:mt-0">
+                <input type="checkbox" id="modeToggle">
+                <span class="slider rounded-full">
+                    <span class="slider-text pl-4">가이드 모드</span>
+                    <span class="slider-text pr-4">프롬프트 연구소</span>
+                </span>
+            </label>
+        </header>
+
+        <hr class="border-t border-gray-700 my-4">
+
+        <!-- Main Content Area (Dynamic based on mode) -->
+        <main id="mainContent" class="w-full">
+            <!-- Guided Mode (Default) -->
+            <div id="guidedMode" class="space-y-6">
+                <div class="flex items-center gap-4">
+                    <h2 class="text-2xl font-bold">가이드 모드</h2>
+                    <span class="text-sm px-3 py-1 bg-blue-500 rounded-full">초보자용</span>
+                </div>
+                <div class="input-card rounded-xl p-6 space-y-4">
+                    <h3 class="text-xl font-bold text-coral-color">1. 영감의 씨앗</h3>
+                    <p class="text-sm opacity-80">표현하고 싶은 수학적 개념을 입력해주세요.</p>
+                    <input type="text" id="mathConcept" placeholder="예: 피보나치 수열, 오일러의 등식..." class="w-full p-3 rounded-lg bg-white/10 border border-white/20 focus:outline-none focus:ring-2 focus:ring-highlight-color">
+                </div>
+                <div class="input-card rounded-xl p-6 space-y-4">
+                    <h3 class="text-xl font-bold text-coral-color">2. 당신의 해석</h3>
+                    <p class="text-sm opacity-80">개념에 대한 당신의 주관적인 느낌이나 생각을 서술해주세요.</p>
+                    <textarea id="personalInterpretation" placeholder="예: 끝없는 반복 속의 완벽한 질서..." rows="3" class="w-full p-3 rounded-lg bg-white/10 border border-white/20 focus:outline-none focus:ring-2 focus:ring-highlight-color"></textarea>
+                </div>
+                <div class="input-card rounded-xl p-6 space-y-4">
+                    <h3 class="text-xl font-bold text-coral-color">3. 예술적 스타일</h3>
+                    <p class="text-sm opacity-80">원하는 화풍, 장르, 작가 등을 선택하거나 입력해주세요.</p>
+                    <div class="flex flex-wrap gap-2" id="styleTags">
+                        <!-- Tags will be dynamically generated here -->
+                    </div>
+                    <input type="text" id="customStyle" placeholder="예: 초현실주의, 살바도르 달리, 오케스트라..." class="w-full p-3 rounded-lg bg-white/10 border border-white/20 focus:outline-none focus:ring-2 focus:ring-highlight-color">
+                </div>
+                <div class="input-card rounded-xl p-6 space-y-4">
+                    <h3 class="text-xl font-bold text-coral-color">4. 추가적인 디테일</h3>
+                    <p class="text-sm opacity-80">작품에 적용하고 싶은 세부 묘사나 매체를 입력해주세요.</p>
+                    <label for="detailedDescription" class="block text-sm font-bold opacity-80">세부 묘사</label>
+                    <textarea id="detailedDescription" placeholder="예: 빛의 방향, 질감, 분위기..." rows="2" class="w-full p-3 rounded-lg bg-white/10 border border-white/20 focus:outline-none focus:ring-2 focus:ring-highlight-color"></textarea>
+                    <label for="artisticMedium" class="block text-sm font-bold opacity-80 mt-4">예술적 매체</label>
+                    <input type="text" id="artisticMedium" placeholder="예: 디지털 페인팅, 유화, 3D 렌더링..." class="w-full p-3 rounded-lg bg-white/10 border border-white/20 focus:outline-none focus:ring-2 focus:ring-highlight-color">
+                </div>
+            </div>
+
+            <!-- Lab Mode -->
+            <div id="labMode" class="hidden">
+                <div class="flex items-center gap-4 mb-6">
+                    <h2 class="text-2xl font-bold">프롬프트 연구소</h2>
+                    <span class="text-sm px-3 py-1 bg-green-500 rounded-full">전문가용</span>
+                </div>
+                <div class="lab-mode-grid grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Control Panel (Left) -->
+                    <div class="space-y-6">
+                        <div class="input-card rounded-xl p-6 space-y-4">
+                            <h3 class="text-xl font-bold text-coral-color">전체 제어 패널</h3>
+                            <p class="text-sm opacity-80">모든 옵션을 한눈에 보며 세밀하게 제어하세요.</p>
+                            <label for="labMathConcept" class="block mt-4">수학 개념</label>
+                            <input type="text" id="labMathConcept" placeholder="예: 프랙탈 도형" class="w-full p-3 rounded-lg bg-white/10 border border-white/20 focus:outline-none focus:ring-2 focus:ring-highlight-color">
+                            <label for="labInterpretation" class="block mt-4">개인적 해석</label>
+                            <textarea id="labInterpretation" placeholder="예: 무한히 반복되는 자기 유사성의 미학" rows="2" class="w-full p-3 rounded-lg bg-white/10 border border-white/20 focus:outline-none focus:ring-2 focus:ring-highlight-color"></textarea>
+                            <label for="labStyle" class="block mt-4">예술적 스타일</label>
+                            <input type="text" id="labStyle" placeholder="예: 디지털 아트, 네온, 80년대..." class="w-full p-3 rounded-lg bg-white/10 border border-white/20 focus:outline-none focus:ring-2 focus:ring-highlight-color">
+                            <label for="labDetailedDescription" class="block mt-4">추가 디테일</label>
+                            <textarea id="labDetailedDescription" placeholder="예: 빛의 방향, 질감, 분위기" rows="2" class="w-full p-3 rounded-lg bg-white/10 border border-white/20 focus:outline-none focus:ring-2 focus:ring-highlight-color"></textarea>
+                            <label for="labArtisticMedium" class="block mt-4">예술적 매체</label>
+                            <input type="text" id="labArtisticMedium" placeholder="예: 디지털 페인팅, 유화..." class="w-full p-3 rounded-lg bg-white/10 border border-white/20 focus:outline-none focus:ring-2 focus:ring-highlight-color">
+                            <label for="labPromptSuffix" class="block mt-4">프롬프트 후미</label>
+                            <input type="text" id="labPromptSuffix" placeholder="예: masterpiece, high detail..." class="w-full p-3 rounded-lg bg-white/10 border border-white/20 focus:outline-none focus:ring-2 focus:ring-highlight-color">
+                        </div>
+                    </div>
+                    <!-- Prompt Viewer (Right) -->
+                    <div class="space-y-6">
+                        <div class="input-card rounded-xl p-6 h-full flex flex-col">
+                            <h3 class="text-xl font-bold text-coral-color">한국어 프롬프트 뷰어</h3>
+                            <p class="text-sm opacity-80">실시간으로 조합되는 프롬프트를 확인하세요.</p>
+                            <textarea id="promptViewer" readonly rows="10" class="w-full p-3 rounded-lg bg-black/50 border border-white/20 mt-4 flex-grow font-mono resize-none"></textarea>
+                            <button id="copyViewerBtn" class="btn-primary rounded-xl px-6 py-3 mt-4 w-full">프롬프트 복사하기</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+        
+        <!-- Field Selection (Art, Music, Calligraphy) -->
+        <div class="w-full mt-4">
+            <h3 class="text-xl font-bold text-coral-color mb-4">5. 분야별 맞춤 생성</h3>
+            <div class="flex flex-wrap gap-4">
+                <button class="field-btn btn-secondary rounded-xl px-6 py-3 transition-all duration-300 border-2 border-highlight-color text-highlight-color font-bold hover:bg-highlight-color hover:text-white" data-field="art">미술 (Art)</button>
+                <button class="field-btn btn-secondary rounded-xl px-6 py-3 transition-all duration-300" data-field="music">음악 (Music)</button>
+                <button class="field-btn btn-secondary rounded-xl px-6 py-3 transition-all duration-300" data-field="calligraphy">캘리그라피 (Calligraphy)</button>
+            </div>
+        </div>
+
+        <!-- Generated Prompt & Copy Button -->
+        <div class="w-full mt-8">
+            <div class="input-card rounded-xl p-6">
+                <h3 class="text-xl font-bold text-coral-color mb-4">최종 프롬프트</h3>
+                <div class="space-y-4">
+                    <label class="block text-sm font-bold">English Prompt</label>
+                    <textarea id="englishPrompt" readonly rows="4" placeholder="영어로 생성할 내용을 확인하세요." class="w-full p-3 rounded-lg bg-black/50 border border-white/20 font-mono resize-none"></textarea>
+                </div>
+                <button id="translateBtn" class="btn-primary rounded-xl px-6 py-3 mt-4 w-full flex items-center justify-center gap-2">
+                    <span id="translateText">영어 프롬프트로 생성하기</span>
+                    <div id="translateSpinner" class="hidden loading-spinner"></div>
+                </button>
+                <button id="copyBtn" class="btn-primary rounded-xl px-6 py-3 mt-4 w-full">원클릭 복사</button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Inspiration Mixer Modal -->
+    <div id="inspirationModal" class="modal fixed inset-0 flex items-center justify-center p-4 z-50 transition-opacity duration-300 opacity-0 pointer-events-none">
+        <div class="card rounded-2xl p-8 lg:p-12 w-full max-w-2xl text-center relative transform scale-95 transition-transform duration-300">
+            <button id="closeModalBtn" class="absolute top-4 right-4 text-white text-3xl opacity-50 hover:opacity-100">&times;</button>
+            <h2 class="text-3xl font-bold mb-6 text-highlight-color">✨ 영감 믹서 ✨</h2>
+            <div class="inspiration-result-container rounded-xl p-8 space-y-6">
+                <div class="text-2xl font-bold">
+                    <span id="mixerMathConcept" class="text-highlight-color">...</span>
+                </div>
+                <div class="text-xl opacity-80">
+                    <span id="mixerStyle">...</span>
+                </div>
+                <div class="text-lg opacity-60">
+                    <span id="mixerEmotion">...</span>
+                </div>
+                <div class="text-sm opacity-40">
+                    <span id="mixerDetail">...</span>
+                </div>
+            </div>
+            <p class="text-sm opacity-60 mt-4">위 결과는 창작의 시작을 돕기 위한 무작위 조합입니다.</p>
+            <div class="flex flex-col sm:flex-row gap-4 mt-6 justify-center">
+                <button id="remixBtn" class="btn-secondary rounded-full px-6 py-3">다시 섞기</button>
+                <button id="startWithBtn" class="btn-primary rounded-full px-6 py-3">이 조합으로 시작하기</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast/Notification Message -->
+    <div id="notification" class="fixed bottom-8 left-1/2 -translate-x-1/2 bg-gray-800 text-white px-6 py-3 rounded-full shadow-lg opacity-0 transition-opacity duration-300">
+        복사되었습니다!
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const modeToggle = document.getElementById('modeToggle');
+            const guidedMode = document.getElementById('guidedMode');
+            const labMode = document.getElementById('labMode');
+            const mixerButton = document.getElementById('mixerButton');
+            const inspirationModal = document.getElementById('inspirationModal');
+            const closeModalBtn = document.getElementById('closeModalBtn');
+            const remixBtn = document.getElementById('remixBtn');
+            const startWithBtn = document.getElementById('startWithBtn');
+            const promptViewer = document.getElementById('promptViewer');
+            const englishPrompt = document.getElementById('englishPrompt');
+            const copyBtn = document.getElementById('copyBtn');
+            const copyViewerBtn = document.getElementById('copyViewerBtn');
+            const translateBtn = document.getElementById('translateBtn');
+            const translateText = document.getElementById('translateText');
+            const translateSpinner = document.getElementById('translateSpinner');
+            const notification = document.getElementById('notification');
+            
+
+            // Data for Inspiration Mixer
+            const mathConcepts = [
+                '미분', '적분', '선형대수학의 행렬', '확률과 통계', '복소수 평면',
+                '푸리에 변환', '라그랑주 승수법', '리만 제타 함수', '미분 기하학의 곡률', '군론',
+                '위상수학', '암호학의 타원 곡선', '머신러닝의 경사하강법', '게임 이론의 내쉬 균형',
+                '푸앵카레 추측', '텐서(Tensor)', '양자 컴퓨터의 중첩', '베이즈 정리',
+                '비유클리드 기하학', '카오스 이론의 로렌츠 끌개', '푸리에 급수', '만델브로트 집합',
+                '라플라스 변환', '벡터 공간', '미적분학의 기본 정리', '상미분 방정식', '편미분 방정식',
+                '위상 공간', '갤러웨이 정리', '타원 함수', '호지 추측', '푸리에 변환',
+                '클라페이론-클라우시우스 방정식', '가우스-마르코프 정리', '해밀턴 역학', '가우스 발산 정리',
+                '리만 기하학', '위상 불변량', '오일러-라그랑주 방정식', '푸앵카레 추측', '코시-리만 방정식',
+                '비선형 동역학', '오토마타 이론', '튜링 머신', '양자 역학의 슈뢰딩거 방정식', '정보 이론의 엔트로피',
+                '빅데이터의 주성분 분석 (PCA)', '뉴턴 역학', '아인슈타인 방정식', '블랙-숄즈 모델',
+                '이토 적분', '몬테카를로 시뮬레이션', '대칭군', '피타고라스 정리', '골드바흐 추측',
+                '소수 정리', '유클리드 알고리즘', '페르마의 마지막 정리', '오일러의 오각형 정리'
+            ];
+            const artStyles = [
+                '글리치 아트', '복셀 아트', '로우 폴리 스타일', '사이버펑크', '스팀펑크',
+                '미디어 아트', '데이터 시각화', '유전 알고리즘 아트', '생성형 AI 스타일',
+                '포토리얼리즘', '입체파', '추상표현주의', '네온 효과', '디지털 페인팅',
+                '픽셀 아트', '바이오펑크', '아톰펑크', '솔라펑크', 'VR/AR 아트',
+                '증강현실 아트', '3D 모델링', '컴퓨터 그래픽스', '생명체 시뮬레이션', '입자 효과',
+                '모션 그래픽스', '기하학적 추상화', '미니멀리즘', '인포그래픽', '초현실주의',
+                '다다이즘', '러시아 구성주의', '추상 미술', '바우하우스', '옵아트',
+                '팝 아트', '오케스트라', '전자 음악', '엠비언트', '클래식'
+            ];
+            const emotions = [
+                '논리적 엄밀함', '수렴하는 안정성', '무한한 불확실성', '자기 유사성의 조화',
+                '대칭의 아름다움', '미래에 대한 갈망', '혼돈 속의 질서', '알고리즘의 고독',
+                '이진법의 경쾌함', '수학적 증명의 희열', '오차 범위의 불안정성', '파동의 숭고함',
+                '복잡성 속의 단순함', '예측 불가능한 우아함', '무한한 가능성', '직관과 논리의 충돌',
+                '알 수 없는 미지의 영역', '데이터의 군집화', '네트워크의 복잡성', '계산의 미학',
+                '미래 기술에 대한 기대', '디지털 시대의 감성', '기계적 반복의 리듬', '변수의 상호작용',
+                '패턴의 발견', '변화의 흐름', '시스템의 붕괴', '양자적 연결'
+            ];
+            const additionalDetails = [
+                '비선형적 움직임', '입체적인 홀로그램', '양자 역학적 불확실성', '생체-기계적 연결',
+                '데이터 스트림의 시각화', '네온 빛의 잔상 효과', '무한 루프', '회로 기판의 복잡성',
+                '코드 블록이 흩날리는 효과', '그래프 이론의 노드와 엣지', '빛의 스펙트럼',
+                '메타버스 공간', '인터페이스 디자인', '데이터 시각화 그래프', '유기적 회로',
+                '빛의 굴절과 반사', '노이즈와 필터 효과', '물리 엔진 시뮬레이션', '입자 시스템',
+                '알고리즘적 패턴', '생성형 패턴', '자기조직화 네트워크', '액체 시뮬레이션',
+                '파동 함수', '에너지 필드', '빛의 분산', '오브젝트의 상호작용', '오류 및 노이즈',
+                '메탈릭 질감', '글로시한 표면', '유리 및 투명 재료', '빛나는 입자', '모래의 흐름'
+            ];
+
+            // AI Model-specific prompt templates
+            const promptTemplates = {
+                dalle: {
+                    art: (concept_ko, interpretation_ko, style_ko, detailed_ko, medium_ko, concept_en, interpretation_en, style_en, detailed_en, medium_en) => {
+                        const koreanPrompt = `[수학적 개념: ${concept_ko}]을 기반으로 한 작품을 생성해 주세요.\n\n**스타일/디테일:** [${interpretation_ko}] 분위기와 [${style_ko}] 화풍을 적용하여 [${detailed_ko}] 디테일을 포함하세요. 마스터피스 퀄리티의 [${medium_ko}]으로 제작합니다.`;
+                        const englishPrompt = `Generate a work of art based on the mathematical concept of [${concept_en}].\n\n**Style/Details:** Apply a [${interpretation_en}] mood and a [${style_en}] style, incorporating [${detailed_en}] details. Produce it as a [${medium_en}] of masterpiece quality.`;
+                        return { korean: koreanPrompt, english: englishPrompt };
+                    },
+                    calligraphy: (concept_ko, interpretation_ko, style_ko, detailed_ko, medium_ko, concept_en, interpretation_en, style_en, detailed_en, medium_en) => {
+                        const koreanPrompt = `수학 공식 "${concept_ko}" (${concept_en})를 [${interpretation_ko}] 느낌의 [${style_ko}] 서체로 표현하는 캘리그라피 작품을 생성하세요.\n\n**스타일/디테일:** 마스터피스 퀄리티로, [${detailed_ko}] 아래에서 빛나는 [${medium_ko}]을 담아내고, [먹물]과 [붓]의 질감을 강조하세요.`;
+                        const englishPrompt = `Create a calligraphy artwork of the mathematical formula "${concept_en}" with a [${interpretation_en}] feel and a [${style_en}] font style.\n\n**Style/Details:** Capture [${detailed_en}] glowing under [${medium_en}], emphasizing the texture of [ink] and the [brush].`;
+                        return { korean: koreanPrompt, english: englishPrompt };
+                    },
+                },
+                suno: {
+                    music: (concept_ko, interpretation_ko, style_ko, concept_en, interpretation_en, style_en) => {
+                        const koreanPrompt = `[${concept_ko}]에 대한 노래를 만들어주세요.\n\n**스타일/장르:** [${interpretation_ko}] 분위기의 [${style_ko}] 장르를 사용하고, [몽환적인] 느낌을 추가하세요.\n\n**가사:** [${concept_ko}는 아름다워] 같은 가사를 반복적으로 사용하세요.`;
+                        const englishPrompt = `Create a song about [${concept_en}].\n\n**Style/Genre:** Use a [${interpretation_en}] atmosphere and a [${style_en}] genre, and add a [dreamy] feel.\n\n**Lyrics:** Repeat lyrics like [${concept_en} is beautiful].`;
+                        return { korean: koreanPrompt, english: englishPrompt };
+                    }
+                }
+            };
+            
+            let englishPromptData = {
+                concept: "",
+                interpretation: "",
+                style: "",
+                detailed: "",
+                medium: ""
+            };
+            
+            // Function to translate Korean to English using Gemini API
+            async function translateKoreanToEnglish(text) {
+                const apiKey = typeof __api_key !== 'undefined' ? __api_key : '';
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+
+                if (!text || /[a-zA-Z]/.test(text)) {
+                    return text;
+                }
+
+                let retryCount = 0;
+                const maxRetries = 5;
+                const baseDelay = 1000;
+
+                while (retryCount < maxRetries) {
+                    try {
+                        const payload = {
+                            contents: [{
+                                parts: [{ text: `Translate the following Korean text to English, just give me the translated text and nothing else:\n${text}` }]
+                            }],
+                        };
+
+                        const response = await fetch(apiUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+
+                        if (!response.ok) {
+                            if (response.status === 429) {
+                                retryCount++;
+                                const delay = baseDelay * Math.pow(2, retryCount - 1);
+                                await new Promise(res => setTimeout(res, delay));
+                                continue;
+                            }
+                            throw new Error(`API call failed with status: ${response.status}`);
+                        }
+
+                        const result = await response.json();
+                        const translatedText = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+                        if (translatedText) {
+                            return translatedText.trim();
+                        } else {
+                            throw new Error('Translation failed: No translated text in response.');
+                        }
+                    } catch (error) {
+                        console.error('Translation error:', error);
+                        return text;
+                    }
+                }
+                return text;
+            }
+
+            const elements = {
+                // Guided Mode
+                mathConcept: document.getElementById('mathConcept'),
+                personalInterpretation: document.getElementById('personalInterpretation'),
+                customStyle: document.getElementById('customStyle'),
+                detailedDescription: document.getElementById('detailedDescription'),
+                artisticMedium: document.getElementById('artisticMedium'),
+                // Lab Mode
+                labMathConcept: document.getElementById('labMathConcept'),
+                labInterpretation: document.getElementById('labInterpretation'),
+                labStyle: document.getElementById('labStyle'),
+                labDetailedDescription: document.getElementById('labDetailedDescription'),
+                labArtisticMedium: document.getElementById('labArtisticMedium'),
+                labPromptSuffix: document.getElementById('labPromptSuffix'),
+            };
+
+            let currentField = 'art';
+
+            // Function to show toast notification
+            const showNotification = (message) => {
+                notification.textContent = message;
+                notification.classList.remove('opacity-0', '-translate-x-1/2');
+                notification.classList.add('opacity-100', 'translate-y-0');
+                setTimeout(() => {
+                    notification.classList.remove('opacity-100', 'translate-y-0');
+                    notification.classList.add('opacity-0', '-translate-x-1/2');
+                }, 2000);
+            };
+
+            // Function to update the Korean prompt
+            const updateKoreanPrompt = () => {
+                const conceptValue = elements.mathConcept.value || elements.labMathConcept.value;
+                const interpretationValue = elements.personalInterpretation.value || elements.labInterpretation.value;
+                const styleValue = elements.customStyle.value || elements.labStyle.value;
+                const detailedValue = elements.detailedDescription.value || elements.labDetailedDescription.value;
+                const mediumValue = elements.artisticMedium.value || elements.labArtisticMedium.value;
+                const labSuffix_ko = elements.labPromptSuffix.value;
+
+                let koreanPrompt;
+                if (modeToggle.checked) {
+                    koreanPrompt = `[수학적 개념: ${conceptValue}]을 적용하고, [${interpretationValue}] 분위기와 [${styleValue}] 화풍을 추가하세요. [${detailedValue}] 디테일과 [${mediumValue}] 매체를 사용하세요. ${labSuffix_ko}`;
+                } else {
+                    switch(currentField) {
+                        case 'art':
+                            koreanPrompt = `[수학적 개념: ${conceptValue}]을 기반으로 한 작품을 생성해 주세요.\n\n**스타일/디테일:** [${interpretationValue}] 분위기와 [${styleValue}] 화풍을 적용하여 [${detailedValue}] 디테일을 포함하세요. 마스터피스 퀄리티의 [${mediumValue}]으로 제작합니다.`;
+                            break;
+                        case 'music':
+                            koreanPrompt = `[${conceptValue}]에 대한 노래를 만들어주세요.\n\n**스타일/장르:** [${interpretationValue}] 분위기의 [${styleValue}] 장르를 사용하고, [몽환적인] 느낌을 추가하세요.\n\n**가사:** [${conceptValue}는 아름다워] 같은 가사를 반복적으로 사용하세요.`;
+                            break;
+                        case 'calligraphy':
+                            koreanPrompt = `수학 공식 "${conceptValue}"를 [${interpretationValue}] 느낌의 [${styleValue}] 서체로 표현하는 캘리그라피 작품을 생성하세요.\n\n**스타일/디테일:** 마스터피스 퀄리티로, [${detailedValue}] 아래에서 빛나는 [${mediumValue}]을 담아내고, [먹물]과 [붓]의 질감을 강조하세요.`;
+                            break;
+                    }
+                }
+                promptViewer.value = koreanPrompt;
+            };
+
+            // Function to translate and update the English prompt
+            const translateAndGenerate = async () => {
+                translateBtn.disabled = true;
+                translateText.textContent = "생성 중...";
+                translateSpinner.classList.remove('hidden');
+                englishPrompt.value = "생성 중입니다. 잠시만 기다려 주세요...";
+                
+                const conceptValue = elements.mathConcept.value || elements.labMathConcept.value;
+                const interpretationValue = elements.personalInterpretation.value || elements.labInterpretation.value;
+                const styleValue = elements.customStyle.value || elements.labStyle.value;
+                const detailedValue = elements.detailedDescription.value || elements.labDetailedDescription.value;
+                const mediumValue = elements.artisticMedium.value || elements.labArtisticMedium.value;
+                const labSuffix_ko = elements.labPromptSuffix.value;
+
+                try {
+                    const translatedConcept = await translateKoreanToEnglish(conceptValue);
+                    const translatedInterpretation = await translateKoreanToEnglish(interpretationValue);
+                    const translatedStyle = await translateKoreanToEnglish(styleValue);
+                    const translatedDetailed = await translateKoreanToEnglish(detailedValue);
+                    const translatedMedium = await translateKoreanToEnglish(mediumValue);
+                    const translatedSuffix = await translateKoreanToEnglish(labSuffix_ko);
+                    
+                    let promptContent;
+                    if (modeToggle.checked) {
+                        promptContent = `Apply the mathematical concept [${translatedConcept}] and add a [${translatedInterpretation}] mood and a [${translatedStyle}] style. Use [${translatedDetailed}] details and a [${translatedMedium}] medium. ${translatedSuffix}`;
+                    } else {
+                        switch(currentField) {
+                            case 'art':
+                                promptContent = `Generate a work of art based on the mathematical concept of [${translatedConcept}].\n\n**Style/Details:** Apply a [${translatedInterpretation}] mood and a [${translatedStyle}] style, incorporating [${translatedDetailed}] details. Produce it as a [${translatedMedium}] of masterpiece quality.`;
+                                break;
+                            case 'music':
+                                promptContent = `Create a song about [${translatedConcept}].\n\n**Style/Genre:** Use a [${translatedInterpretation}] atmosphere and a [${translatedStyle}] genre, and add a [dreamy] feel.\n\n**Lyrics:** Repeat lyrics like [${translatedConcept} is beautiful].`;
+                                break;
+                            case 'calligraphy':
+                                promptContent = `Create a calligraphy artwork of the mathematical formula "${translatedConcept}" with a [${translatedInterpretation}] feel and a [${translatedStyle}] font style.\n\n**Style/Details:** Capture [${translatedDetailed}] glowing under [${translatedMedium}], emphasizing the texture of [ink] and the [brush].`;
+                                break;
+                        }
+                    }
+                    
+                    englishPrompt.value = promptContent;
+                } catch (error) {
+                    englishPrompt.value = "번역 중 오류가 발생했습니다. 다시 시도해 주세요.";
+                    console.error("Translation failed:", error);
+                } finally {
+                    translateBtn.disabled = false;
+                    translateText.textContent = "영어 프롬프트로 번역하기";
+                    translateSpinner.classList.add('hidden');
+                }
+            };
+
+            // Event Listeners for updating Korean prompt
+            Object.values(elements).forEach(element => {
+                element.addEventListener('input', updateKoreanPrompt);
+            });
+            
+            // New listener for the translate button
+            translateBtn.addEventListener('click', translateAndGenerate);
+
+            // Mode Toggle
+            modeToggle.addEventListener('change', () => {
+                if (modeToggle.checked) {
+                    guidedMode.classList.add('hidden');
+                    labMode.classList.remove('hidden');
+                } else {
+                    guidedMode.classList.remove('hidden');
+                    labMode.classList.add('hidden');
+                }
+                updateKoreanPrompt();
+            });
+
+            // Field Selection
+            document.querySelectorAll('.field-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelector('.field-btn.border-highlight-color').classList.remove('border-highlight-color', 'text-highlight-color', 'font-bold', 'hover:bg-highlight-color', 'hover:text-white');
+                    btn.classList.add('border-highlight-color', 'text-highlight-color', 'font-bold', 'hover:bg-highlight-color', 'hover:text-white');
+                    
+                    currentField = btn.dataset.field;
+                    updateKoreanPrompt();
+                });
+            });
+
+            // Inspiration Mixer
+            mixerButton.addEventListener('click', () => {
+                generateInspiration();
+                inspirationModal.classList.remove('opacity-0', 'pointer-events-none');
+                inspirationModal.classList.add('opacity-100');
+                document.querySelector('#inspirationModal > div').classList.remove('scale-95');
+                document.querySelector('#inspirationModal > div').classList.add('scale-100');
+            });
+
+            closeModalBtn.addEventListener('click', () => {
+                inspirationModal.classList.remove('opacity-100');
+                inspirationModal.classList.add('opacity-0', 'pointer-events-none');
+                document.querySelector('#inspirationModal > div').classList.remove('scale-100');
+                document.querySelector('#inspirationModal > div').classList.add('scale-95');
+            });
+            
+            remixBtn.addEventListener('click', generateInspiration);
+
+            startWithBtn.addEventListener('click', () => {
+                const math = document.getElementById('mixerMathConcept').textContent;
+                const style = document.getElementById('mixerStyle').textContent;
+                const emotion = document.getElementById('mixerEmotion').textContent;
+                const detail = document.getElementById('mixerDetail').textContent;
+
+                elements.mathConcept.value = math;
+                elements.personalInterpretation.value = emotion;
+                elements.customStyle.value = style;
+                elements.detailedDescription.value = detail;
+
+                elements.labMathConcept.value = math;
+                elements.labInterpretation.value = emotion;
+                elements.labStyle.value = style;
+                elements.labDetailedDescription.value = detail;
+
+                updateKoreanPrompt();
+                closeModalBtn.click();
+            });
+
+            function generateInspiration() {
+                document.getElementById('mixerMathConcept').textContent = mathConcepts[Math.floor(Math.random() * mathConcepts.length)];
+                document.getElementById('mixerStyle').textContent = artStyles[Math.floor(Math.random() * artStyles.length)];
+                document.getElementById('mixerEmotion').textContent = emotions[Math.floor(Math.random() * emotions.length)];
+                document.getElementById('mixerDetail').textContent = additionalDetails[Math.floor(Math.random() * additionalDetails.length)];
+            }
+
+            // Copy to clipboard
+            const copyTextToClipboard = (text) => {
+                const textArea = document.createElement("textarea");
+                textArea.value = text;
+                textArea.style.position = "fixed";
+                textArea.style.left = "-9999px";
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    showNotification('복사되었습니다!');
+                } catch (err) {
+                    console.error('클립보드 복사 실패:', err);
+                    showNotification('복사 실패');
+                }
+                document.body.removeChild(textArea);
+            };
+            
+            copyBtn.addEventListener('click', () => {
+                copyTextToClipboard(englishPrompt.value);
+            });
+            
+            copyViewerBtn.addEventListener('click', () => {
+                copyTextToClipboard(promptViewer.value);
+            });
+
+            // Initial prompt update
+            updateKoreanPrompt();
+        });
+    </script>
+</body>
+</html>
